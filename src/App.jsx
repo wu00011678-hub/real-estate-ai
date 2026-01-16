@@ -24,6 +24,9 @@ import {
 // 若您在本機 Vite 環境下，可以改回 import.meta.env.VITE_GEMINI_API_KEY
 const FIXED_API_KEY = "AIzaSyARQlNaq5jzChL95NStRGbugaY4hhHEy0A"; 
 
+// 2. AI 模型選擇: 使用目前最新且最穩定的 Flash 版本
+const MODEL_NAME = "gemini-1.5-flash";
+
 // --- 輔助工具：延遲函數 ---
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -120,7 +123,7 @@ export default function RealEstateContentApp() {
       } else if (msg.includes('403')) {
         setError('權限錯誤 (403)：API Key 無法存取。請確認您的 Google Cloud 專案已啟用 Generative Language API。');
       } else if (msg.includes('404')) {
-        setError('模型錯誤 (404)：找不到指定的 AI 模型版本。');
+        setError(`模型錯誤 (404)：找不到模型 ${MODEL_NAME}。請檢查 API Key 是否正確。`);
       } else if (msg.includes('Safety')) {
         setError('內容被 AI 安全過濾器阻擋，請嘗試修改輸入內容。');
       } else {
@@ -144,7 +147,7 @@ export default function RealEstateContentApp() {
     return safeJsonParse(response);
   }
 
-  // --- 2. 分析圖片 ---
+  // --- 2. 分析圖片 (★重要更新★：支援政策新聞與物件銷售雙模式) ---
   async function analyzeImageWithGemini(file, key) {
     if (!imagePreview) throw new Error("圖片資料尚未準備好，請重新上傳");
     const base64Data = imagePreview.split(',')[1];
@@ -182,8 +185,7 @@ export default function RealEstateContentApp() {
   async function retryFetchImage(payload, key, retries = 3) {
     for (let i = 0; i < retries; i++) {
       try {
-        // ★★★ 關鍵修改：使用更明確的 gemini-1.5-flash-002 版本 ★★★
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent?key=${key}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -288,8 +290,7 @@ export default function RealEstateContentApp() {
 
     for (let i = 0; i < retries; i++) {
       try {
-        // ★★★ 關鍵修改：使用更明確的 gemini-1.5-flash-002 版本 ★★★
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent?key=${key}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
