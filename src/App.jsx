@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-// 注意：在本機 VS Code 執行時，請務必取消下面這行的註解，樣式才會生效！
-// import './index.css'; 
+
 import { 
   Clapperboard, 
   Facebook, 
@@ -119,7 +118,9 @@ export default function RealEstateContentApp() {
       if (msg.includes('429')) {
         setError('API 使用量已達上限 (429)，請休息一分鐘後再試。');
       } else if (msg.includes('403')) {
-        setError('權限錯誤 (403)：您的 API Key 可能無法存取此模型，或模型版本不支援。已嘗試自動切換為 gemini-1.5-flash。');
+        setError('權限錯誤 (403)：API Key 無法存取。請確認您的 Google Cloud 專案已啟用 Generative Language API。');
+      } else if (msg.includes('404')) {
+        setError('模型錯誤 (404)：找不到指定的 AI 模型版本。');
       } else if (msg.includes('Safety')) {
         setError('內容被 AI 安全過濾器阻擋，請嘗試修改輸入內容。');
       } else {
@@ -143,7 +144,7 @@ export default function RealEstateContentApp() {
     return safeJsonParse(response);
   }
 
-  // --- 2. 分析圖片 (★重要更新★：使用 gemini-1.5-flash 以避免 403 錯誤) ---
+  // --- 2. 分析圖片 ---
   async function analyzeImageWithGemini(file, key) {
     if (!imagePreview) throw new Error("圖片資料尚未準備好，請重新上傳");
     const base64Data = imagePreview.split(',')[1];
@@ -181,8 +182,8 @@ export default function RealEstateContentApp() {
   async function retryFetchImage(payload, key, retries = 3) {
     for (let i = 0; i < retries; i++) {
       try {
-        // ★★★ 關鍵修改：將模型改為更穩定的 gemini-1.5-flash ★★★
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+        // ★★★ 關鍵修改：使用更明確的 gemini-1.5-flash-002 版本 ★★★
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent?key=${key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -287,8 +288,8 @@ export default function RealEstateContentApp() {
 
     for (let i = 0; i < retries; i++) {
       try {
-        // ★★★ 關鍵修改：將模型改為更穩定的 gemini-1.5-flash ★★★
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+        // ★★★ 關鍵修改：使用更明確的 gemini-1.5-flash-002 版本 ★★★
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-002:generateContent?key=${key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
