@@ -24,8 +24,8 @@ import {
 // 若您在本機 Vite 環境下，可以改回 import.meta.env.VITE_GEMINI_API_KEY
 const FIXED_API_KEY = "AIzaSyARQlNaq5jzChL95NStRGbugaY4hhHEy0A"; 
 
-// 2. AI 模型選擇: 使用目前最新且最穩定的 Flash 版本
-const MODEL_NAME = "gemini-1.5-flash";
+// 2. AI 模型選擇: 使用明確的版本號 001 以避免 404 錯誤
+const MODEL_NAME = "gemini-1.5-flash-001";
 
 // --- 輔助工具：延遲函數 ---
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -123,7 +123,7 @@ export default function RealEstateContentApp() {
       } else if (msg.includes('403')) {
         setError('權限錯誤 (403)：API Key 無法存取。請確認您的 Google Cloud 專案已啟用 Generative Language API。');
       } else if (msg.includes('404')) {
-        setError(`模型錯誤 (404)：找不到模型 ${MODEL_NAME}。請檢查 API Key 是否正確。`);
+        setError(`模型錯誤 (404)：找不到模型 ${MODEL_NAME}。請確保 API Key 正確且支援此版本。`);
       } else if (msg.includes('Safety')) {
         setError('內容被 AI 安全過濾器阻擋，請嘗試修改輸入內容。');
       } else {
@@ -167,7 +167,8 @@ export default function RealEstateContentApp() {
 {
   "text": "整合後的重點摘要內容...",
   "keywords": ["關鍵字1", "關鍵字2", "關鍵字3", "關鍵字4", "關鍵字5"]
-}`;
+}
+`;
 
     const payload = {
       contents: [{
