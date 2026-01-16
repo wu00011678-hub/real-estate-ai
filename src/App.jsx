@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-// 注意：在本機 VS Code 執行時，請務必取消下面這行的註解，樣式才會生效！
- import './index.css'; 
+
 import { 
   Clapperboard, 
   Facebook, 
@@ -21,11 +20,11 @@ import {
 } from 'lucide-react';
 
 // --- 設定區：API Key ---
-// 為了避免編譯錯誤，這裡直接使用字串。
-// 若您在支援的環境下，可以使用 import.meta.env.VITE_GEMINI_API_KEY
+// 為了避免編譯錯誤 (import.meta 在此環境不支援)，這裡直接使用字串。
+// 若您在本機 Vite 環境下，可以改回 import.meta.env.VITE_GEMINI_API_KEY
 const FIXED_API_KEY = "AIzaSyARQlNaq5jzChL95NStRGbugaY4hhHEy0A"; 
 
-// --- 輔助工具：延遲函數 (防止 API 429 錯誤) ---
+// --- 輔助工具：延遲函數 ---
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default function RealEstateContentApp() {
@@ -39,11 +38,11 @@ export default function RealEstateContentApp() {
   // 設定選項
   const [videoLength, setVideoLength] = useState('60'); 
   const [fbLength, setFbLength] = useState('medium'); 
-  const [officialAccount, setOfficialAccount] = useState(''); // 官方帳號
+  const [officialAccount, setOfficialAccount] = useState(''); 
   
   // 生成結果狀態
   const [loading, setLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState(''); // 進度狀態
+  const [statusMessage, setStatusMessage] = useState('');
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
   const [activeTab, setActiveTab] = useState('script'); 
@@ -82,7 +81,6 @@ export default function RealEstateContentApp() {
     setStatusMessage('正在分析內容...');
 
     try {
-      // 步驟 1: 分析內容
       let baseContent = '';
       let keywords = [];
       
@@ -91,21 +89,19 @@ export default function RealEstateContentApp() {
         baseContent = analysis.summary;
         keywords = analysis.keywords;
       } else {
+        // 圖片模式：呼叫升級版分析
         const analysis = await analyzeImageWithGemini(selectedImage, apiKey);
         baseContent = analysis.text;
         keywords = analysis.keywords;
       }
 
-      // 步驟 2: 依序生成 (加大延遲以避免 Rate Limit)
-      
-      // 2.1 生成腳本
+      // 依序生成腳本與貼文
       setStatusMessage('正在撰寫短影音腳本 (1/2)... (稍候 3 秒)');
-      await delay(3000); // 延遲 3 秒
+      await delay(3000); 
       const scriptData = await generateVideoScript(baseContent, keywords, videoLength, apiKey);
       
-      // 2.2 生成貼文
       setStatusMessage('正在撰寫社群貼文 (2/2)... (稍候 5 秒)');
-      await delay(5000); // 延遲 5 秒
+      await delay(5000);
       const fbData = await generateSocialPost(baseContent, keywords, fbLength, officialAccount, apiKey);
 
       setResult({
@@ -118,10 +114,9 @@ export default function RealEstateContentApp() {
       
     } catch (err) {
       console.error(err);
-      // 顯示更友善的錯誤訊息
       const msg = err.message || '未知錯誤';
       if (msg.includes('429')) {
-        setError('API 使用量已達上限 (429)，請休息一分鐘後再試，或升級 Google Cloud 帳戶。');
+        setError('API 使用量已達上限 (429)，請休息一分鐘後再試。');
       } else if (msg.includes('Safety')) {
         setError('內容被 AI 安全過濾器阻擋，請嘗試修改輸入內容。');
       } else {
@@ -133,9 +128,7 @@ export default function RealEstateContentApp() {
     }
   };
 
-  // --- API 呼叫函數 ---
-
-  // 1. 分析文字
+  // --- 1. 分析文字 ---
   async function analyzeTextWithGemini(text, key) {
     const prompt = `
       你是一個專業的房地產分析師。請分析以下內容：
@@ -147,15 +140,33 @@ export default function RealEstateContentApp() {
     return safeJsonParse(response);
   }
 
-  // 2. 分析圖片
+  // --- 2. 分析圖片 (★重要更新★：支援政策新聞與物件銷售雙模式) ---
   async function analyzeImageWithGemini(file, key) {
+    if (!imagePreview) throw new Error("圖片資料尚未準備好，請重新上傳");
     const base64Data = imagePreview.split(',')[1];
-    const mimeType = file.type;
+    
+    // 升級版 Prompt：具備判斷能力
+    const promptText = `你是一位專業的房地產文案專家。請先判斷這張圖片的類型，再進行資訊擷取：
+
+情況 A：如果是【房地產物件銷售】(如傳單、格局圖、建物照片)：
+- 請擷取：總價、單價、坪數、格局、樓層、屋齡、地點、賣點。
+
+情況 B：如果是【政策/新聞/市場資訊】(如新聞截圖、政府公告、數據圖表)：
+- 請擷取：政策名稱/標題、關鍵日期(實施日)、影響對象、主要變革重點、市場數據趨勢。
+
+【最終輸出】：請將辨識到的資訊整理成一段通順的「重點摘要」，並提取 5 個關鍵字。
+
+請以 JSON 格式回傳：
+{
+  "text": "整合後的重點摘要內容...",
+  "keywords": ["關鍵字1", "關鍵字2", "關鍵字3", "關鍵字4", "關鍵字5"]
+}`;
+
     const payload = {
       contents: [{
         parts: [
-          { text: "請辨識圖片文字並總結賣點。回傳 JSON：{ \"text\": \"...\", \"keywords\": [\"...\"] }" },
-          { inline_data: { mime_type: mimeType, data: base64Data } }
+          { text: promptText }, 
+          { inline_data: { mime_type: file.type, data: base64Data } }
         ]
       }],
       generationConfig: { responseMimeType: "application/json" }
@@ -188,13 +199,11 @@ export default function RealEstateContentApp() {
         if (data.error) throw new Error(data.error.message);
 
         const candidate = data.candidates?.[0];
-        const finishReason = candidate?.finishReason;
         const text = candidate?.content?.parts?.[0]?.text;
         
         if (!text) {
-             console.warn("API response empty. Finish Reason:", finishReason);
-             if (finishReason === 'SAFETY') throw new Error("圖片內容被 AI 安全過濾器阻擋");
-             throw new Error(`AI 無法辨識圖片 (原因: ${finishReason || '未知'})`);
+             console.warn("API response empty");
+             throw new Error(`AI 無法辨識圖片內容`);
         }
         
         return safeJsonParse(String(text));
@@ -206,7 +215,7 @@ export default function RealEstateContentApp() {
     }
   }
 
-  // 3. 生成短影音腳本
+  // --- 3. 生成短影音腳本 ---
   async function generateVideoScript(content, keywords, seconds, key) {
     const prompt = `
       你是一個短影音行銷專家。請根據以下房地產資訊生成一支 ${seconds} 秒的口播腳本。
@@ -233,7 +242,7 @@ export default function RealEstateContentApp() {
     return safeJsonParse(response);
   }
 
-  // 4. 生成 FB/IG 貼文
+  // --- 4. 生成 FB/IG 貼文 ---
   async function generateSocialPost(content, keywords, length, account, key) {
     const lengthMap = { short: '短篇', medium: '中篇', long: '長篇' };
     
