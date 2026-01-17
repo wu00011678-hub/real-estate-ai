@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-
+// 注意：在本機 VS Code 執行時，請務必取消下面這行的註解，樣式才會生效！
+// import './index.css'; 
 import { 
   Clapperboard, 
   Facebook, 
@@ -24,8 +25,8 @@ import {
 // 若您在本機 Vite 環境下，可以改回 import.meta.env.VITE_GEMINI_API_KEY
 const FIXED_API_KEY = "AIzaSyARQlNaq5jzChL95NStRGbugaY4hhHEy0A"; 
 
-// 2. AI 模型選擇: 使用明確的版本號 001 以避免 404 錯誤
-const MODEL_NAME = "gemini-1.5-flash-001";
+// 2. AI 模型選擇: 改用 gemini-1.5-pro (旗艦版)，通常能解決 Flash 版的 404 問題
+const MODEL_NAME = "gemini-1.5-pro";
 
 // --- 輔助工具：延遲函數 ---
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -121,9 +122,9 @@ export default function RealEstateContentApp() {
       if (msg.includes('429')) {
         setError('API 使用量已達上限 (429)，請休息一分鐘後再試。');
       } else if (msg.includes('403')) {
-        setError('權限錯誤 (403)：API Key 無法存取。請確認您的 Google Cloud 專案已啟用 Generative Language API。');
+        setError('權限錯誤 (403)：API Key 無效或未啟用 API 服務。請確認您的 Google AI Studio 設定。');
       } else if (msg.includes('404')) {
-        setError(`模型錯誤 (404)：找不到模型 ${MODEL_NAME}。請確保 API Key 正確且支援此版本。`);
+        setError(`模型錯誤 (404)：找不到模型 ${MODEL_NAME}。請確認您的 API Key 是否支援此版本。`);
       } else if (msg.includes('Safety')) {
         setError('內容被 AI 安全過濾器阻擋，請嘗試修改輸入內容。');
       } else {
@@ -147,12 +148,12 @@ export default function RealEstateContentApp() {
     return safeJsonParse(response);
   }
 
-  // --- 2. 分析圖片 (★重要更新★：支援政策新聞與物件銷售雙模式) ---
+  // --- 2. 分析圖片 (使用雙模式判斷) ---
   async function analyzeImageWithGemini(file, key) {
     if (!imagePreview) throw new Error("圖片資料尚未準備好，請重新上傳");
     const base64Data = imagePreview.split(',')[1];
     
-    // 升級版 Prompt：具備判斷能力
+    // 升級版 Prompt
     const promptText = `你是一位專業的房地產文案專家。請先判斷這張圖片的類型，再進行資訊擷取：
 
 情況 A：如果是【房地產物件銷售】(如傳單、格局圖、建物照片)：
@@ -167,8 +168,7 @@ export default function RealEstateContentApp() {
 {
   "text": "整合後的重點摘要內容...",
   "keywords": ["關鍵字1", "關鍵字2", "關鍵字3", "關鍵字4", "關鍵字5"]
-}
-`;
+}`;
 
     const payload = {
       contents: [{
