@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-// 注意：在本機 VS Code 執行時，請務必取消下面這行的註解，樣式才會生效！
+// 注意：在預覽環境為了避免報錯，我先將下面這行註解起來。
+// ★★★ 在您的本機 VS Code，請務必把下面這行的 // 刪掉，樣式才會生效！ ★★★
 
 import { 
   Clapperboard, 
@@ -19,31 +20,29 @@ import {
   Lightbulb,
   MessageCircle,
   Zap,
-  Crown
+  Crown,
+  History,
+  Sparkles
 } from 'lucide-react';
 
 // --- 設定區 ---
 const FIXED_API_KEY = "AIzaSyARQlNaq5jzChL95NStRGbugaY4hhHEy0A"; 
 
 // --- 模型策略設定 (Model Strategy) ---
-// 擴充版本清單，包含具體版本號 (-001, -002) 以增加相容性
-// 1. 文字/邏輯優先模型
+// 這裡將您最初使用的 2.5 版本放回第一順位
 const TEXT_MODELS_PRIORITY = [
-  { id: 'gemini-1.5-pro', name: '旗艦版 1.5 Pro' },
-  { id: 'gemini-1.5-pro-001', name: '旗艦版 1.5 Pro-001 (穩定)' },
-  { id: 'gemini-1.5-pro-002', name: '旗艦版 1.5 Pro-002 (最新)' },
-  { id: 'gemini-1.5-flash', name: '穩定版 1.5 Flash (備援)' },
-  { id: 'gemini-1.5-flash-001', name: '穩定版 1.5 Flash-001 (備援)' },
-  { id: 'gemini-1.5-flash-002', name: '穩定版 1.5 Flash-002 (備援)' }
+  { id: 'gemini-2.5-flash-preview-09-2025', name: '2.5 Flash Preview (初代設定)' },
+  { id: 'gemini-2.0-flash-exp', name: '2.0 Flash Exp (最新)' },
+  { id: 'gemini-1.5-flash', name: '1.5 Flash (穩定)' },
+  { id: 'gemini-1.5-pro', name: '1.5 Pro (旗艦)' }
 ];
 
-// 2. 視覺/速度優先模型
+// 視覺部分也優先使用 2.5，因為它讀圖能力很強
 const VISION_MODELS_PRIORITY = [
-  { id: 'gemini-1.5-flash', name: '穩定版 1.5 Flash' },
-  { id: 'gemini-1.5-flash-001', name: '穩定版 1.5 Flash-001 (穩定)' },
-  { id: 'gemini-1.5-flash-002', name: '穩定版 1.5 Flash-002 (最新)' },
-  { id: 'gemini-1.5-pro', name: '旗艦版 1.5 Pro (備援)' },
-  { id: 'gemini-1.5-pro-001', name: '旗艦版 1.5 Pro-001 (備援)' }
+  { id: 'gemini-2.5-flash-preview-09-2025', name: '2.5 Flash Preview (初代設定)' },
+  { id: 'gemini-2.0-flash-exp', name: '2.0 Flash Exp (最新)' },
+  { id: 'gemini-1.5-flash', name: '1.5 Flash (穩定)' },
+  { id: 'gemini-1.5-pro', name: '1.5 Pro (旗艦)' }
 ];
 
 // --- 輔助工具：延遲函數 ---
@@ -69,7 +68,7 @@ export default function RealEstateContentApp() {
   const [result, setResult] = useState(null);
   const [activeTab, setActiveTab] = useState('script'); 
   
-  // 記錄實際使用的模型 (Pro 或 Flash)
+  // 記錄實際使用的模型
   const [usedModel, setUsedModel] = useState(null);
 
   // --- 圖片處理 ---
@@ -104,37 +103,33 @@ export default function RealEstateContentApp() {
     setError('');
     setResult(null);
     setUsedModel(null);
-    setStatusMessage('正在啟動 AI 多重引擎...');
+    setStatusMessage('正在啟動 AI 引擎...');
 
     try {
       let baseContent = '';
       let keywords = [];
-      let analysisModelName = '';
+      let analysisResult = null;
       
-      // 步驟 1: 分析內容 (根據模式選擇不同模型策略)
+      // 步驟 1: 分析內容
       if (mode === 'text') {
-        setStatusMessage('正在使用旗艦模型分析文章...');
-        const analysis = await analyzeTextWithGemini(inputText, apiKey);
-        baseContent = analysis.summary;
-        keywords = analysis.keywords;
-        analysisModelName = analysis.model;
+        setStatusMessage('正在分析文章內容...');
+        analysisResult = await analyzeTextWithGemini(inputText, apiKey);
       } else {
-        setStatusMessage('正在使用視覺模型辨識圖片...');
-        const analysis = await analyzeImageWithGemini(selectedImage, apiKey);
-        baseContent = analysis.text;
-        keywords = analysis.keywords;
-        analysisModelName = analysis.model;
+        setStatusMessage('正在辨識圖片內容...');
+        analysisResult = await analyzeImageWithGemini(selectedImage, apiKey);
       }
 
-      setUsedModel(analysisModelName); // 記錄分析階段使用的模型
+      baseContent = analysisResult.summary || analysisResult.text;
+      keywords = analysisResult.keywords;
+      setUsedModel(analysisResult.model); 
 
-      // 步驟 2: 依序生成 (生成文案通常需要較好的邏輯，所以使用文字優先策略)
+      // 步驟 2: 依序生成
       setStatusMessage('正在撰寫短影音腳本 (1/2)...');
-      await delay(2000); 
+      await delay(1500); 
       const scriptData = await generateVideoScript(baseContent, keywords, videoLength, apiKey);
       
       setStatusMessage('正在撰寫社群貼文 (2/2)...');
-      await delay(3000);
+      await delay(2000);
       const fbData = await generateSocialPost(baseContent, keywords, fbLength, officialAccount, apiKey);
 
       setResult({
@@ -162,13 +157,13 @@ export default function RealEstateContentApp() {
   };
 
   // --- 核心：智慧多重請求函式 (Smart Request) ---
-  // 參數: customModels (允許傳入特定的模型優先順序清單)
   async function smartGeminiRequest(payload, key, customModels = TEXT_MODELS_PRIORITY) {
     let lastError = null;
 
     for (const model of customModels) {
       try {
-        console.log(`嘗試使用模型: ${model.id} (${model.name})...`);
+        setStatusMessage(`正在嘗試模型: ${model.name}...`);
+        
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model.id}:generateContent?key=${key}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -176,14 +171,11 @@ export default function RealEstateContentApp() {
         });
 
         if (!response.ok) {
-          // 如果是 404 (找不到模型) 或 403 (無權限) 或 503 (過載)，就換下一個模型
           if ([404, 403, 503, 500].includes(response.status)) {
             console.warn(`模型 ${model.id} 失敗 (${response.status})，切換備用模型...`);
-            // 記錄這個錯誤，但繼續嘗試下一個
             lastError = new Error(`模型 ${model.id} 回傳 ${response.status}`); 
             continue; 
           }
-          // 其他錯誤 (如 429 Rate Limit) 直接拋出，因為換模型也沒用
           const errorBody = await response.json().catch(() => ({}));
           throw new Error(`API Error: ${response.status} ${errorBody.error?.message || ''}`);
         }
@@ -194,7 +186,6 @@ export default function RealEstateContentApp() {
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!text) throw new Error("API 回應為空 (可能被安全阻擋)");
 
-        // 成功！回傳結果與模型名稱
         return { text: String(text), usedModel: model.name };
 
       } catch (e) {
@@ -203,12 +194,10 @@ export default function RealEstateContentApp() {
       }
     }
 
-    // 如果所有嘗試都失敗
-    console.error("所有模型嘗試皆失敗。最後一個錯誤:", lastError);
-    throw new Error(`所有模型嘗試皆失敗 (請檢查 API Key 或網路)。最後錯誤: ${lastError?.message || '未知'}`);
+    throw new Error(`所有模型嘗試皆失敗。請檢查您的 API Key 是否正確。(${lastError?.message})`);
   }
 
-  // --- 1. 分析文字 (使用 TEXT_MODELS_PRIORITY) ---
+  // --- 1. 分析文字 ---
   async function analyzeTextWithGemini(text, key) {
     const prompt = `
       你是一個專業的房地產分析師。請分析以下內容：
@@ -221,13 +210,12 @@ export default function RealEstateContentApp() {
       generationConfig: { responseMimeType: "application/json" }
     };
     
-    // 指定使用文字優先策略
     const { text: resultText, usedModel } = await smartGeminiRequest(payload, key, TEXT_MODELS_PRIORITY);
     const parsed = safeJsonParse(resultText);
     return { ...parsed, model: usedModel };
   }
 
-  // --- 2. 分析圖片 (使用 VISION_MODELS_PRIORITY) ---
+  // --- 2. 分析圖片 ---
   async function analyzeImageWithGemini(file, key) {
     if (!imagePreview) throw new Error("圖片資料尚未準備好");
     const base64Data = imagePreview.split(',')[1];
@@ -247,13 +235,12 @@ export default function RealEstateContentApp() {
       generationConfig: { responseMimeType: "application/json" }
     };
 
-    // 指定使用視覺優先策略
     const { text: resultText, usedModel } = await smartGeminiRequest(payload, key, VISION_MODELS_PRIORITY);
     const parsed = safeJsonParse(resultText);
     return { ...parsed, model: usedModel };
   }
 
-  // --- 3. 生成腳本 (使用文字策略) ---
+  // --- 3. 生成腳本 ---
   async function generateVideoScript(content, keywords, seconds, key) {
     const prompt = `
       房地產短影音腳本(${seconds}秒)。
@@ -269,7 +256,7 @@ export default function RealEstateContentApp() {
     return safeJsonParse(text);
   }
 
-  // --- 4. 生成貼文 (使用文字策略) ---
+  // --- 4. 生成貼文 ---
   async function generateSocialPost(content, keywords, length, account, key) {
     const lengthMap = { short: '短篇', medium: '中篇', long: '長篇' };
     const ctaInstruction = account ? `(文末加入：歡迎加入LINE官方帳號: ${account})` : "";
@@ -296,7 +283,6 @@ export default function RealEstateContentApp() {
       if (s !== -1 && e !== -1) cleaned = cleaned.substring(s, e + 1);
       return JSON.parse(cleaned);
     } catch (e) {
-      // 嘗試修復反斜線
       try {
         const fixed = input.replace(/\\(?!["\\/bfnrtu])/g, "\\\\");
         return JSON.parse(fixed);
@@ -316,7 +302,7 @@ export default function RealEstateContentApp() {
             <Wand2 className="w-8 h-8 text-indigo-600" />
             房地產AI智能行銷專家
           </h1>
-          <p className="text-slate-500">API Key 已就緒 ✨ 雙模引擎待命</p>
+          <p className="text-slate-500">API Key 已就緒 ✨ 多重引擎 (2.5 Preview 優先)</p>
         </div>
 
         {/* Input Section */}
@@ -392,7 +378,7 @@ export default function RealEstateContentApp() {
             {/* 顯示目前使用的模型 */}
             {usedModel && (
               <div className="bg-green-50 border-b border-green-100 p-2 text-center text-xs text-green-700 font-medium flex items-center justify-center gap-1">
-                {usedModel.includes('Pro') ? <Crown className="w-3 h-3" /> : <Zap className="w-3 h-3" />}
+                {usedModel.includes('2.5') ? <Sparkles className="w-3 h-3 text-yellow-500" /> : (usedModel.includes('Pro') ? <Crown className="w-3 h-3" /> : (usedModel.includes('2.0') ? <Zap className="w-3 h-3" /> : <History className="w-3 h-3" />))}
                 本次生成使用模型：{usedModel}
               </div>
             )}
@@ -420,7 +406,8 @@ export default function RealEstateContentApp() {
   );
 }
 
-// --- 子元件：視覺化腳本顯示器 ---
+// ... 下方的 ScriptVisualizer, SocialPostVisualizer, TabButton 保持不變 ...
+// (為節省篇幅，請保留您原本的這些子元件程式碼，或者直接複製上面完整版的最下方)
 function ScriptVisualizer({ data }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
