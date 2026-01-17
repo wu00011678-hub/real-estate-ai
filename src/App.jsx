@@ -22,7 +22,8 @@ import {
   Zap,
   Crown,
   History,
-  Sparkles
+  Sparkles,
+  Save // 新增 Save 圖示
 } from 'lucide-react';
 
 // --- 設定區 ---
@@ -59,8 +60,17 @@ export default function RealEstateContentApp() {
   // 設定選項
   const [videoLength, setVideoLength] = useState('60'); 
   const [fbLength, setFbLength] = useState('medium'); 
-  const [officialAccount, setOfficialAccount] = useState(''); 
   
+  // 官方帳號 (初始化時嘗試從 LocalStorage 讀取)
+  const [officialAccount, setOfficialAccount] = useState(() => {
+    // 檢查是否在瀏覽器環境
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('real_estate_official_account') || '';
+    }
+    return '';
+  }); 
+  const [isSaved, setIsSaved] = useState(false); // 控制儲存按鈕的狀態顯示
+
   // 生成結果狀態
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -70,6 +80,14 @@ export default function RealEstateContentApp() {
   
   // 記錄實際使用的模型
   const [usedModel, setUsedModel] = useState(null);
+
+  // --- 儲存官方帳號功能 ---
+  const handleSaveAccount = () => {
+    localStorage.setItem('real_estate_official_account', officialAccount);
+    setIsSaved(true);
+    // 2秒後恢復按鈕狀態
+    setTimeout(() => setIsSaved(false), 2000);
+  };
 
   // --- 圖片處理 ---
   const handleImageUpload = (e) => {
@@ -259,12 +277,30 @@ export default function RealEstateContentApp() {
   // --- 4. 生成貼文 ---
   async function generateSocialPost(content, keywords, length, account, key) {
     const lengthMap = { short: '短篇', medium: '中篇', long: '長篇' };
-    const ctaInstruction = account ? `(文末加入：歡迎加入LINE官方帳號: ${account})` : "";
+    
+    // 優化後的 CTA 指令
+    let ctaInstruction = "(請自行撰寫吸引人的 CTA)";
+    if (account) {
+      ctaInstruction = `(請務必在文末 CTA 加入固定文字：「如果你有關於房地產的問題或是想獲取更多資訊，歡迎加入官方帳號: ${account}」)`;
+    }
+
     const prompt = `
-      房地產FB貼文(${lengthMap[length]})。
-      內容：${content}
-      ${ctaInstruction}
-      回傳 JSON：{"content": "...", "image_prompt": "..."}
+      你是一個台灣在地化的房地產社群小編。請根據以下資訊寫一篇 Facebook 貼文。
+      
+      資訊內容：${content}
+      篇幅：${lengthMap[length]}
+      官方帳號連結：${account || '無'} ${ctaInstruction}
+      
+      風格要求：
+      1. 接地氣且人性化，製造衝突點 (如買vs租)。
+      2. 需包含 Emoji 與 Hashtags。
+      3. 重要：如果使用顏文字 (如 ¯\\_(ツ)_/¯ )，請務必將反斜線跳脫 (例如 ¯\\\\_(ツ)_/¯ ) 以符合 JSON 格式。
+      
+      請嚴格遵守 JSON 格式回傳，結構如下：
+      {
+        "content": "貼文完整內容 (Markdown 格式)",
+        "image_prompt": "適合此貼文的 AI 繪圖提示詞 (英文, 高畫質, 寫實風格, 適合 Gemini Nano 或 Filmora 生成, 描述一個吸引人的場景)"
+      }
     `;
     const payload = {
       contents: [{ parts: [{ text: prompt }] }],
@@ -348,9 +384,26 @@ export default function RealEstateContentApp() {
               </div>
             </div>
 
+            {/* 優化後的官方帳號區塊：加入儲存按鈕 */}
             <div>
               <label className="text-sm font-medium text-slate-700 mb-2 flex items-center gap-1"><MessageCircle className="w-4 h-4" /> 官方帳號 (自動加入貼文 CTA)</label>
-              <input type="text" value={officialAccount} onChange={(e) => setOfficialAccount(e.target.value)} placeholder="例如：Line ID @house123" className="w-full p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50" />
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={officialAccount} 
+                  onChange={(e) => setOfficialAccount(e.target.value)} 
+                  placeholder="例如：Line ID @house123 或 https://lin.ee/..." 
+                  className="flex-1 p-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50" 
+                />
+                <button 
+                  onClick={handleSaveAccount}
+                  className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 font-medium shadow-sm border ${isSaved ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                  title="儲存官方帳號，下次自動帶入"
+                >
+                  {isSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+                  {isSaved ? '已儲存' : '儲存'}
+                </button>
+              </div>
             </div>
 
             {error && <div className="p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-2 font-medium border border-red-100"><AlertCircle className="w-5 h-5 shrink-0" />{error}</div>}
