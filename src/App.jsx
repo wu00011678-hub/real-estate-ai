@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// 注意：在本機 VS Code 執行時，請務必取消下面這行的註解，樣式才會生效！
 
 import { 
   Clapperboard, 
@@ -25,16 +26,24 @@ import {
 const FIXED_API_KEY = "AIzaSyARQlNaq5jzChL95NStRGbugaY4hhHEy0A"; 
 
 // --- 模型策略設定 (Model Strategy) ---
-// 1. 文字/邏輯優先模型 (用於文章摘要、腳本生成) -> 優先使用 Pro
+// 擴充版本清單，包含具體版本號 (-001, -002) 以增加相容性
+// 1. 文字/邏輯優先模型
 const TEXT_MODELS_PRIORITY = [
-  { id: 'gemini-1.5-pro', name: '旗艦版 1.5 Pro (擅長深度分析)' },
-  { id: 'gemini-1.5-flash', name: '穩定版 1.5 Flash (備援)' }
+  { id: 'gemini-1.5-pro', name: '旗艦版 1.5 Pro' },
+  { id: 'gemini-1.5-pro-001', name: '旗艦版 1.5 Pro-001 (穩定)' },
+  { id: 'gemini-1.5-pro-002', name: '旗艦版 1.5 Pro-002 (最新)' },
+  { id: 'gemini-1.5-flash', name: '穩定版 1.5 Flash (備援)' },
+  { id: 'gemini-1.5-flash-001', name: '穩定版 1.5 Flash-001 (備援)' },
+  { id: 'gemini-1.5-flash-002', name: '穩定版 1.5 Flash-002 (備援)' }
 ];
 
-// 2. 視覺/速度優先模型 (用於圖片OCR、快速識別) -> 優先使用 Flash
+// 2. 視覺/速度優先模型
 const VISION_MODELS_PRIORITY = [
-  { id: 'gemini-1.5-flash', name: '穩定版 1.5 Flash (擅長視覺識別)' },
-  { id: 'gemini-1.5-pro', name: '旗艦版 1.5 Pro (備援)' }
+  { id: 'gemini-1.5-flash', name: '穩定版 1.5 Flash' },
+  { id: 'gemini-1.5-flash-001', name: '穩定版 1.5 Flash-001 (穩定)' },
+  { id: 'gemini-1.5-flash-002', name: '穩定版 1.5 Flash-002 (最新)' },
+  { id: 'gemini-1.5-pro', name: '旗艦版 1.5 Pro (備援)' },
+  { id: 'gemini-1.5-pro-001', name: '旗艦版 1.5 Pro-001 (備援)' }
 ];
 
 // --- 輔助工具：延遲函數 ---
@@ -95,7 +104,7 @@ export default function RealEstateContentApp() {
     setError('');
     setResult(null);
     setUsedModel(null);
-    setStatusMessage('正在啟動 AI 雙模引擎...');
+    setStatusMessage('正在啟動 AI 多重引擎...');
 
     try {
       let baseContent = '';
@@ -152,7 +161,7 @@ export default function RealEstateContentApp() {
     }
   };
 
-  // --- 核心：智慧雙模請求函式 (Smart Request) ---
+  // --- 核心：智慧多重請求函式 (Smart Request) ---
   // 參數: customModels (允許傳入特定的模型優先順序清單)
   async function smartGeminiRequest(payload, key, customModels = TEXT_MODELS_PRIORITY) {
     let lastError = null;
@@ -170,7 +179,9 @@ export default function RealEstateContentApp() {
           // 如果是 404 (找不到模型) 或 403 (無權限) 或 503 (過載)，就換下一個模型
           if ([404, 403, 503, 500].includes(response.status)) {
             console.warn(`模型 ${model.id} 失敗 (${response.status})，切換備用模型...`);
-            continue; // 跳到下一個迴圈
+            // 記錄這個錯誤，但繼續嘗試下一個
+            lastError = new Error(`模型 ${model.id} 回傳 ${response.status}`); 
+            continue; 
           }
           // 其他錯誤 (如 429 Rate Limit) 直接拋出，因為換模型也沒用
           const errorBody = await response.json().catch(() => ({}));
@@ -193,10 +204,11 @@ export default function RealEstateContentApp() {
     }
 
     // 如果所有嘗試都失敗
-    throw lastError || new Error("所有模型嘗試皆失敗，請稍後再試。");
+    console.error("所有模型嘗試皆失敗。最後一個錯誤:", lastError);
+    throw new Error(`所有模型嘗試皆失敗 (請檢查 API Key 或網路)。最後錯誤: ${lastError?.message || '未知'}`);
   }
 
-  // --- 1. 分析文字 (使用 TEXT_MODELS_PRIORITY -> Pro 優先) ---
+  // --- 1. 分析文字 (使用 TEXT_MODELS_PRIORITY) ---
   async function analyzeTextWithGemini(text, key) {
     const prompt = `
       你是一個專業的房地產分析師。請分析以下內容：
@@ -215,7 +227,7 @@ export default function RealEstateContentApp() {
     return { ...parsed, model: usedModel };
   }
 
-  // --- 2. 分析圖片 (使用 VISION_MODELS_PRIORITY -> Flash 優先) ---
+  // --- 2. 分析圖片 (使用 VISION_MODELS_PRIORITY) ---
   async function analyzeImageWithGemini(file, key) {
     if (!imagePreview) throw new Error("圖片資料尚未準備好");
     const base64Data = imagePreview.split(',')[1];
@@ -241,7 +253,7 @@ export default function RealEstateContentApp() {
     return { ...parsed, model: usedModel };
   }
 
-  // --- 3. 生成腳本 (使用文字策略 -> Pro 優先) ---
+  // --- 3. 生成腳本 (使用文字策略) ---
   async function generateVideoScript(content, keywords, seconds, key) {
     const prompt = `
       房地產短影音腳本(${seconds}秒)。
@@ -257,7 +269,7 @@ export default function RealEstateContentApp() {
     return safeJsonParse(text);
   }
 
-  // --- 4. 生成貼文 (使用文字策略 -> Pro 優先) ---
+  // --- 4. 生成貼文 (使用文字策略) ---
   async function generateSocialPost(content, keywords, length, account, key) {
     const lengthMap = { short: '短篇', medium: '中篇', long: '長篇' };
     const ctaInstruction = account ? `(文末加入：歡迎加入LINE官方帳號: ${account})` : "";
