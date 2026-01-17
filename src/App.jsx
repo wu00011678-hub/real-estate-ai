@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-// 注意：在本機 VS Code 執行時，請務必取消下面這行的註解，樣式才會生效！
-// import './index.css'; 
+
 import { 
   Clapperboard, 
   Facebook, 
